@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { BlinkDetectionEngine } from '../utils/blinkDetection';
+import { useStableAction } from '../hooks/useStableAction';
 import StatusDisplay from './StatusDisplay';
 import ControlPanel from './ControlPanel';
 import CameraView from './CameraView';
@@ -11,16 +12,15 @@ const EyeBlinkDetector: React.FC = () => {
   const animationFrameRef = useRef<number>();
 
   const [isActive, setIsActive] = useState(false);
-  const [currentAction, setCurrentAction] = useState<string>('');
-  const [actionTime, setActionTime] = useState<number>(0);
-  const [selectProgress, setSelectProgress] = useState<number>(0);
   const [cameraError, setCameraError] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   
-  // Add refs to track previous values to prevent unnecessary re-renders
-  const lastActionRef = useRef<string>('');
-  const lastProgressRef = useRef<number>(0);
-  const lastUpdateRef = useRef<number>(0);
+  // Use stable action hook to prevent UI shaking
+  const { currentAction, selectProgress, updateAction } = useStableAction({
+    debounceMs: 250,
+    clearDelayMs: 3000,
+    minChangeThreshold: 0.05
+  });
 
   const startCamera = useCallback(async () => {
     try {
@@ -69,8 +69,7 @@ const EyeBlinkDetector: React.FC = () => {
     }
     
     setIsActive(false);
-    setCurrentAction('');
-    setSelectProgress(0);
+    // No need to manually clear states - useStableAction handles this
   }, []);
 
   const startDetection = useCallback(() => {
@@ -123,33 +122,8 @@ const EyeBlinkDetector: React.FC = () => {
         
         if (result) {
           const { action, selectProgress: progress } = result;
-          const now = Date.now();
-          
-          // Only update if there's a significant change to prevent rapid re-renders
-          const actionChanged = action !== lastActionRef.current;
-          const progressChanged = Math.abs(progress - lastProgressRef.current) > 0.01; // 1% threshold
-          const shouldUpdate = now - lastUpdateRef.current > 100; // Max 10 updates per second
-          
-          if ((actionChanged || progressChanged) && shouldUpdate) {
-            if (actionChanged && action) {
-              setCurrentAction(action);
-              setActionTime(now);
-              lastActionRef.current = action;
-            }
-            
-            if (progressChanged) {
-              setSelectProgress(progress);
-              lastProgressRef.current = progress;
-            }
-            
-            lastUpdateRef.current = now;
-          }
-          
-          // Clear action after 2 seconds
-          if (currentAction && now - actionTime > 2000) {
-            setCurrentAction('');
-            lastActionRef.current = '';
-          }
+          // Use the stable action hook to update states
+          updateAction(action || '', progress);
         }
       } catch (error) {
         console.error('Detection error:', error);
@@ -159,7 +133,7 @@ const EyeBlinkDetector: React.FC = () => {
     };
 
     detect();
-  }, [isActive, currentAction, actionTime]);
+  }, [isActive, updateAction]);
 
   useEffect(() => {
     if (isActive) {

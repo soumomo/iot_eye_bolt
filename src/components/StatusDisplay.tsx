@@ -85,18 +85,23 @@ const StatusDisplay: React.FC<StatusDisplayProps> = memo(({
         {/* Action History */}
         <div className="bg-gray-800 rounded-xl p-4">
           <h4 className="text-white font-medium mb-3">Recent Actions</h4>
-          <div className="space-y-2">
-            {currentAction ? (
-              <div className="flex items-center gap-3 text-sm">
-                <div className={`w-3 h-3 rounded-full bg-gradient-to-r ${getActionColor(currentAction)}`}></div>
-                <span className="text-gray-300">{currentAction}</span>
-                <span className="text-gray-500 ml-auto">Just now</span>
-              </div>
-            ) : (
-              <div className="text-gray-500 text-sm text-center py-2">
-                No recent actions
-              </div>
-            )}
+          <div className="space-y-2 min-h-[2.5rem]"> {/* Fixed minimum height */}
+            <div className="flex items-center gap-3 text-sm transition-all duration-300 ease-out">
+              {currentAction ? (
+                <>
+                  <div 
+                    className={`w-3 h-3 rounded-full bg-gradient-to-r ${getActionColor(currentAction)} transition-all duration-300`}
+                    style={{ transform: 'translateZ(0)' }}
+                  ></div>
+                  <span className="text-gray-300 transition-all duration-300">{currentAction}</span>
+                  <span className="text-gray-500 ml-auto transition-all duration-300">Just now</span>
+                </>
+              ) : (
+                <span className="text-gray-500 text-center py-1 w-full transition-all duration-300">
+                  No recent actions
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
