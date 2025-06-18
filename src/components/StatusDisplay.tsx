@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Eye, ArrowUp, ArrowDown, MousePointer } from 'lucide-react';
 
 interface StatusDisplayProps {
@@ -6,7 +6,7 @@ interface StatusDisplayProps {
   selectProgress: number;
 }
 
-const StatusDisplay: React.FC<StatusDisplayProps> = ({
+const StatusDisplay: React.FC<StatusDisplayProps> = memo(({
   currentAction,
   selectProgress
 }) => {
@@ -43,15 +43,19 @@ const StatusDisplay: React.FC<StatusDisplayProps> = ({
       <div className="space-y-6">
         {/* Current Action Display */}
         <div className="text-center">
-          <div className={`inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-r ${getActionColor(currentAction)} mb-4 shadow-lg`}>
-            <div className="text-white">
+          <div 
+            key={currentAction || 'waiting'}
+            className={`inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-r ${getActionColor(currentAction)} mb-4 shadow-lg transition-all duration-300 ease-out transform`}
+            style={{ transform: 'translateZ(0)' }} // Force hardware acceleration
+          >
+            <div className="text-white transition-all duration-200">
               {getActionIcon(currentAction)}
             </div>
           </div>
-          <div className="text-2xl font-bold text-white mb-2">
+          <div className="text-2xl font-bold text-white mb-2 transition-all duration-200">
             {currentAction || 'Waiting...'}
           </div>
-          <div className="text-gray-400 text-sm">
+          <div className="text-gray-400 text-sm transition-all duration-200">
             {currentAction ? 'Action Detected' : 'No action detected'}
           </div>
         </div>
@@ -65,8 +69,11 @@ const StatusDisplay: React.FC<StatusDisplayProps> = ({
             </div>
             <div className="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
               <div 
-                className="h-full bg-gradient-to-r from-purple-500 to-violet-600 transition-all duration-100 ease-out"
-                style={{ width: `${selectProgress * 100}%` }}
+                className="h-full bg-gradient-to-r from-purple-500 to-violet-600 transition-all duration-300 ease-out transform"
+                style={{ 
+                  width: `${Math.min(selectProgress * 100, 100)}%`,
+                  transform: `translateZ(0)` // Force hardware acceleration
+                }}
               />
             </div>
             <div className="text-gray-400 text-xs mt-2 text-center">
@@ -95,6 +102,8 @@ const StatusDisplay: React.FC<StatusDisplayProps> = ({
       </div>
     </div>
   );
-};
+});
+
+StatusDisplay.displayName = 'StatusDisplay';
 
 export default StatusDisplay;

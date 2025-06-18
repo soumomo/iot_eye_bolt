@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Camera, AlertCircle, Loader2 } from 'lucide-react';
 
 interface CameraViewProps {
@@ -9,7 +9,7 @@ interface CameraViewProps {
   isLoading: boolean;
 }
 
-const CameraView: React.FC<CameraViewProps> = ({
+const CameraView: React.FC<CameraViewProps> = memo(({
   videoRef,
   canvasRef,
   isActive,
@@ -55,10 +55,19 @@ const CameraView: React.FC<CameraViewProps> = ({
           playsInline
           muted
           className={`w-full h-full object-cover ${isActive ? 'block' : 'hidden'}`}
+          style={{ 
+            backfaceVisibility: 'hidden',
+            transform: 'translateZ(0)'
+          }}
         />
         <canvas
           ref={canvasRef}
           className="absolute top-0 left-0 w-full h-full object-cover pointer-events-none opacity-0"
+          style={{ 
+            backfaceVisibility: 'hidden',
+            transform: 'translateZ(0)',
+            imageRendering: 'pixelated'
+          }}
         />
         
         {/* Instructions overlay */}
@@ -81,6 +90,8 @@ const CameraView: React.FC<CameraViewProps> = ({
       </div>
     </div>
   );
-};
+});
+
+CameraView.displayName = 'CameraView';
 
 export default CameraView;
