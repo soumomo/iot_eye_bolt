@@ -241,9 +241,12 @@ const DetectionPage: React.FC = () => {
         <div className="mb-8">
           <div className="bg-white/10 backdrop-blur-xl border border-white/30 rounded-2xl p-8 shadow-2xl shadow-cyan-500/10">
             <h3 className="text-white font-bold text-2xl mb-8 flex items-center gap-4">
-              <div className="w-14 h-14 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full flex items-center justify-center">
-                👁️
-              </div>
+              <ColorWheelSelector
+                colorGroups={colorGroups}
+                currentColorGroup={currentColorGroup}
+                onColorSelect={setCurrentColorGroup}
+                size={56}
+              />
               Eye Detection System
             </h3>
             <EyeBlinkDetector onBlinkDetected={handleBlinkDetection} />
@@ -305,23 +308,6 @@ const DetectionPage: React.FC = () => {
                 </div>
               </div>
             )}
-
-            {/* Color Group Selector */}
-            <div className="bg-white/10 backdrop-blur-xl border border-white/30 rounded-2xl p-6 shadow-2xl shadow-purple-500/10">
-              <h3 className="text-white font-bold text-lg mb-6 flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-                  🎨
-                </div>
-                Color Group Selection
-              </h3>
-              <div className="flex justify-center items-center">
-                <ColorWheelSelector
-                  colorGroups={colorGroups}
-                  currentColorGroup={currentColorGroup}
-                  onColorSelect={setCurrentColorGroup}
-                />
-              </div>
-            </div>
 
             {/* Letter/Number Mapping */}
             {selectionMode === 'character' && (
