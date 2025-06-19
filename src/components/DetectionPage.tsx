@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import EyeBlinkDetector from './EyeBlinkDetector';
-import { ArrowLeft, Eye, Wifi, WifiOff, Monitor, Check, X, Trash2, Circle } from 'lucide-react';
+import { ArrowLeft, Eye, Wifi, WifiOff, Monitor, Check, X, Trash2, Info } from 'lucide-react';
+import ColorWheelSelector from './ColorWheelSelector';
 
 // Color groups configuration
 const colorGroups = [
@@ -25,6 +26,7 @@ const DetectionPage: React.FC = () => {
   const [esp32Socket, setEsp32Socket] = useState<WebSocket | null>(null);
   const [esp32IP, setEsp32IP] = useState('192.168.1.8'); // Updated to match your current ESP32
   const [connectionAttempts, setConnectionAttempts] = useState(0);
+  const [isInstructionsVisible, setIsInstructionsVisible] = useState(false);
 
   // ESP32 configuration
   const ESP32_PORT = 81;
@@ -144,11 +146,6 @@ const DetectionPage: React.FC = () => {
     setOutputText('');
   };
 
-  const getCurrentMode = () => {
-    if (selectionMode === 'color') return 'Selecting Color Group';
-    return `Inputting Characters (${colorGroups[currentColorGroup].name})`;
-  };
-
   const handleBackToModeSelection = () => {
     setCurrentScreen('mode-selection');
   };
@@ -237,11 +234,6 @@ const DetectionPage: React.FC = () => {
                 {isESP32Connected ? <WifiOff className="w-5 h-5" /> : <Wifi className="w-5 h-5" />}
               </button>
             </div>
-            
-            <div className="inline-flex items-center gap-3 bg-gradient-to-r from-blue-500/30 to-purple-500/30 backdrop-blur-lg border border-blue-400/50 px-6 py-3 rounded-full shadow-2xl shadow-blue-500/25">
-              <Eye className="w-5 h-5 text-blue-300" />
-              <span className="text-white text-sm font-semibold tracking-wide">{getModeTitle()}</span>
-            </div>
           </div>
         </div>
 
@@ -322,28 +314,12 @@ const DetectionPage: React.FC = () => {
                 </div>
                 Color Group Selection
               </h3>
-              <div className="grid grid-cols-2 gap-4">
-                {colorGroups.map((group, index) => (
-                  <button
-                    key={group.name}
-                    className={`relative flex flex-col items-center p-6 rounded-2xl transition-all duration-500 transform backdrop-blur-sm ${
-                      currentColorGroup === index
-                        ? `${group.color} ring-4 ring-white/60 shadow-2xl scale-110 shadow-${group.name.toLowerCase()}-500/50`
-                        : `${group.color} opacity-80 hover:opacity-100 hover:scale-105 shadow-lg`
-                    }`}
-                    onClick={() => setCurrentColorGroup(index)}
-                  >
-                    <div className="w-12 h-12 rounded-full bg-white/30 mb-3 flex items-center justify-center backdrop-blur-sm">
-                      <div className={`w-6 h-6 rounded-full ${group.color} shadow-lg`}></div>
-                    </div>
-                    <span className="text-white text-sm font-bold tracking-wide">{group.name}</span>
-                    {currentColorGroup === index && (
-                      <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-r from-white to-blue-100 rounded-full flex items-center justify-center shadow-lg animate-pulse">
-                        <Circle className="w-4 h-4 text-blue-600 fill-current" />
-                      </div>
-                    )}
-                  </button>
-                ))}
+              <div className="flex justify-center items-center">
+                <ColorWheelSelector
+                  colorGroups={colorGroups}
+                  currentColorGroup={currentColorGroup}
+                  onColorSelect={setCurrentColorGroup}
+                />
               </div>
             </div>
 
@@ -446,10 +422,6 @@ const DetectionPage: React.FC = () => {
                     <span className="text-white font-semibold">{colorGroups[currentColorGroup].name}</span>
                   </div>
                 </div>
-                <div className="flex justify-between items-center p-3 bg-white/5 rounded-xl backdrop-blur-sm">
-                  <span className="text-gray-300 font-medium">Current Mode:</span>
-                  <span className="text-white font-semibold text-xs bg-gradient-to-r from-purple-500/30 to-pink-500/30 px-3 py-1 rounded-full">{getCurrentMode()}</span>
-                </div>
               </div>
             </div>
           </div>
@@ -503,29 +475,51 @@ const DetectionPage: React.FC = () => {
             </div>
 
             {/* Instructions */}
-            <div className="bg-white/10 backdrop-blur-xl border border-white/30 rounded-2xl p-6 shadow-2xl shadow-purple-500/10">
-              <h4 className="text-white font-bold text-lg mb-4 flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-violet-500 rounded-full flex items-center justify-center">
-                  💡
+            <div className="bg-white/10 backdrop-blur-xl border border-white/30 rounded-2xl p-4 shadow-2xl shadow-purple-500/10">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                    <Eye className="w-4 h-4 text-white" />
+                  </div>
+                  <span className="text-white font-bold text-lg">{getModeTitle()}</span>
                 </div>
-                Instructions
-              </h4>
-              <div className="text-sm text-gray-200 space-y-3">
-                <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl">
-                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                  <p><span className="font-bold text-blue-300">UP Blink:</span> Navigate color groups upward</p>
-                </div>
-                <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl">
-                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                  <p><span className="font-bold text-green-300">DOWN Blink:</span> Navigate color groups downward</p>
-                </div>
-                <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl">
-                  <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></div>
-                  <p><span className="font-bold text-purple-300">LONG Blink:</span> Select current group</p>
-                </div>
-                <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl">
-                  <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
-                  <p><span className="font-bold text-yellow-300">Click:</span> Add characters to output</p>
+                
+                <div 
+                  className="relative"
+                  onMouseEnter={() => setIsInstructionsVisible(true)}
+                  onMouseLeave={() => setIsInstructionsVisible(false)}
+                >
+                  <button className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors">
+                    <Info className="w-5 h-5 text-blue-300" />
+                  </button>
+                  {isInstructionsVisible && (
+                    <div className="absolute bottom-full right-0 mb-2 w-80 bg-gray-900/80 backdrop-blur-lg border border-white/20 rounded-2xl p-6 shadow-2xl z-20">
+                      <h4 className="text-white font-bold text-lg mb-4 flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-violet-500 rounded-full flex items-center justify-center">
+                          💡
+                        </div>
+                        Instructions
+                      </h4>
+                      <div className="text-sm text-gray-200 space-y-3">
+                        <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl">
+                          <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                          <p><span className="font-bold text-blue-300">UP Blink:</span> Navigate color groups upward</p>
+                        </div>
+                        <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl">
+                          <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                          <p><span className="font-bold text-green-300">DOWN Blink:</span> Navigate color groups downward</p>
+                        </div>
+                        <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl">
+                          <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></div>
+                          <p><span className="font-bold text-purple-300">LONG Blink:</span> Select current group</p>
+                        </div>
+                        <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl">
+                          <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
+                          <p><span className="font-bold text-yellow-300">Click:</span> Add characters to output</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

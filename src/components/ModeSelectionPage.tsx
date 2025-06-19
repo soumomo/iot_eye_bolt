@@ -43,7 +43,7 @@ const ModeSelectionPage: React.FC = () => {
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-            IOT Eye Bolt
+            Netra Vaani
           </h1>
           <p className="text-2xl text-gray-300 max-w-3xl mx-auto mb-4">
             Choose Your Communication Mode

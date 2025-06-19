@@ -2,7 +2,6 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { BlinkDetectionEngine } from '../utils/blinkDetection';
 import { useStableAction } from '../hooks/useStableAction';
 import StatusDisplay from './StatusDisplay';
-import ControlPanel from './ControlPanel';
 import CameraView from './CameraView';
 
 interface EyeBlinkDetectorProps {
@@ -168,18 +167,13 @@ const EyeBlinkDetector: React.FC<EyeBlinkDetectorProps> = ({ onBlinkDetected }) 
             isActive={isActive}
             cameraError={cameraError}
             isLoading={isLoading}
-          />
-        </div>
-
-        {/* Control Panel */}
-        <div className="space-y-6">
-          <ControlPanel
-            isActive={isActive}
-            isLoading={isLoading}
             onStart={startCamera}
             onStop={stopCamera}
           />
-          
+        </div>
+
+        {/* Status Display */}
+        <div className="space-y-6">
           <StatusDisplay
             currentAction={currentAction}
             selectProgress={selectProgress}
