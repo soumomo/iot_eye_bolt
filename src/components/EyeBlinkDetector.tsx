@@ -5,7 +5,11 @@ import StatusDisplay from './StatusDisplay';
 import ControlPanel from './ControlPanel';
 import CameraView from './CameraView';
 
-const EyeBlinkDetector: React.FC = () => {
+interface EyeBlinkDetectorProps {
+  onBlinkDetected?: (blinkData: any) => void;
+}
+
+const EyeBlinkDetector: React.FC<EyeBlinkDetectorProps> = ({ onBlinkDetected }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const detectionEngineRef = useRef<BlinkDetectionEngine | null>(null);
@@ -16,7 +20,7 @@ const EyeBlinkDetector: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   
   // Use stable action hook to prevent UI shaking
-  const { currentAction, selectProgress, updateAction } = useStableAction({
+  const { currentAction, selectProgress, updateAction, clearAction } = useStableAction({
     debounceMs: 250,
     clearDelayMs: 3000,
     minChangeThreshold: 0.05
@@ -69,8 +73,9 @@ const EyeBlinkDetector: React.FC = () => {
     }
     
     setIsActive(false);
-    // No need to manually clear states - useStableAction handles this
-  }, []);
+    // Clear the action display when camera is stopped
+    clearAction();
+  }, [clearAction]);
 
   const startDetection = useCallback(() => {
     let lastProcessTime = 0;
@@ -124,6 +129,11 @@ const EyeBlinkDetector: React.FC = () => {
           const { action, selectProgress: progress } = result;
           // Use the stable action hook to update states
           updateAction(action || '', progress);
+          
+          // Call the callback if provided
+          if (onBlinkDetected && action) {
+            onBlinkDetected({ action, selectProgress: progress });
+          }
         }
       } catch (error) {
         console.error('Detection error:', error);
@@ -133,7 +143,7 @@ const EyeBlinkDetector: React.FC = () => {
     };
 
     detect();
-  }, [isActive, updateAction]);
+  }, [isActive, updateAction, onBlinkDetected]);
 
   useEffect(() => {
     if (isActive) {
