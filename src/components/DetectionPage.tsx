@@ -4,14 +4,94 @@ import EyeBlinkDetector from './EyeBlinkDetector';
 import { ArrowLeft, Eye, Wifi, WifiOff, Monitor, Check, X, Trash2 } from 'lucide-react';
 import ColorWheelSelector from './ColorWheelSelector';
 
-// Color groups configuration
+// ESP32 Logic - Color and Position based letter mapping (matching your Arduino code)
+const ESP32_LOGIC = {
+  // Define modes (matching ESP32)
+  modes: {
+    LETTER: 'LETTER MODE',
+    NUMBER: 'NUMBER MODE', 
+    KEYWORD: 'KEYWORD MODE'
+  },
+  
+  // Define commands (matching ESP32)
+  commands: {
+    UP: 'UP',
+    DOWN: 'DOWN',
+    BLINK: 'BLINK',
+    RESET: 'RESET'
+  },
+  
+  // Define colors in order (c1, c2, c3, c4, c5, c6 from your Arduino code)
+  colors: ['YELLOW', 'BLUE', 'RED', 'BLACK', 'PINK', 'GREEN'], // c1-c6
+  
+  // Define positions for stepper motor (matching ESP32)
+  positions: [0, 33, 67, 100, 133, 167], // position indices 0-5 matching currentPositionIndex1
+  
+  // Letter mapping based on color and position (matching your ESP32 Arduino code exactly)
+  letterMapping: {
+    'YELLOW': { 1: 'H', 2: 'T', 4: 'N', 5: 'B' },      // c1
+    'BLUE': { 1: 'I', 2: 'U', 4: 'O', 5: 'C' },        // c2  
+    'RED': { 1: 'L', 2: 'X', 3: 'Z', 4: 'R', 5: 'F' },  // c3
+    'BLACK': { 1: 'K', 2: 'W', 3: 'Y', 4: 'Q', 5: 'E' }, // c4
+    'PINK': { 1: 'J', 2: 'V', 4: 'P', 5: 'D' },        // c5
+    'GREEN': { 1: 'G', 2: 'S', 4: 'M', 5: 'A' }        // c6
+  },
+
+  // Helper function to get letter based on color and position (like your Arduino logic)
+  getLetterForColorPosition: function(colorIndex: number, positionIndex: number): string | null {
+    const colorName = this.colors[colorIndex];
+    const mapping = this.letterMapping[colorName as keyof typeof this.letterMapping];
+    if (mapping && mapping[positionIndex as keyof typeof mapping]) {
+      return mapping[positionIndex as keyof typeof mapping];
+    }
+    return null;
+  }
+};
+
+// Color groups configuration (updated to match ESP32 logic)
 const colorGroups = [
-  { name: 'Green', color: 'bg-green-500', border: 'border-green-400', letters: ['A', 'G', 'M', 'S', 'Y', '1', '7'] },
-  { name: 'Yellow', color: 'bg-yellow-500', border: 'border-yellow-400', letters: ['B', 'H', 'N', 'T', 'Z', '2', '8'] },
-  { name: 'Pink', color: 'bg-pink-500', border: 'border-pink-400', letters: ['C', 'I', 'O', 'U', '3', '9'] },
-  { name: 'Blue', color: 'bg-blue-500', border: 'border-blue-400', letters: ['D', 'J', 'P', 'V', '4', '0'] },
-  { name: 'Black', color: 'bg-gray-900', border: 'border-gray-700', letters: ['E', 'K', 'Q', 'W', '5'] },
-  { name: 'Red', color: 'bg-red-500', border: 'border-red-400', letters: ['F', 'L', 'R', 'X', '6'] },
+  { 
+    name: 'Yellow', 
+    color: 'bg-yellow-500', 
+    border: 'border-yellow-400', 
+    letters: Object.values(ESP32_LOGIC.letterMapping.YELLOW),
+    esp32Color: 'YELLOW'
+  },
+  { 
+    name: 'Blue', 
+    color: 'bg-blue-500', 
+    border: 'border-blue-400', 
+    letters: Object.values(ESP32_LOGIC.letterMapping.BLUE),
+    esp32Color: 'BLUE'
+  },
+  { 
+    name: 'Red', 
+    color: 'bg-red-500', 
+    border: 'border-red-400', 
+    letters: Object.values(ESP32_LOGIC.letterMapping.RED),
+    esp32Color: 'RED'
+  },
+  { 
+    name: 'Black', 
+    color: 'bg-gray-900', 
+    border: 'border-gray-700', 
+    letters: Object.values(ESP32_LOGIC.letterMapping.BLACK),
+    esp32Color: 'BLACK'
+  },
+  { 
+    name: 'Pink', 
+    color: 'bg-pink-500', 
+    border: 'border-pink-400', 
+    letters: Object.values(ESP32_LOGIC.letterMapping.PINK),
+    esp32Color: 'PINK'
+  },
+  { 
+    name: 'Green', 
+    color: 'bg-green-500', 
+    border: 'border-green-400', 
+    letters: Object.values(ESP32_LOGIC.letterMapping.GREEN),
+    esp32Color: 'GREEN'
+  },
 ];
 
 const DetectionPage: React.FC = () => {
@@ -21,15 +101,83 @@ const DetectionPage: React.FC = () => {
   const [isESP32Connected, setIsESP32Connected] = useState(false);
   const [esp32Status, setEsp32Status] = useState('Offline');
   const [currentColorGroup, setCurrentColorGroup] = useState(0);
+  const [currentPositionIndex, setCurrentPositionIndex] = useState(0); // ESP32 position tracking
   const [selectionMode, setSelectionMode] = useState<'color' | 'character'>('color');
   const [outputText, setOutputText] = useState('');
   const [esp32Socket, setEsp32Socket] = useState<WebSocket | null>(null);
-  const [esp32IP, setEsp32IP] = useState('192.168.1.9'); // Updated to match your current ESP32
+  const [esp32IP, setEsp32IP] = useState('192.168.1.8'); // Updated to match your current ESP32
   const [connectionAttempts, setConnectionAttempts] = useState(0);
-  const [isInstructionsVisible, setIsInstructionsVisible] = useState(false);
 
   // ESP32 configuration
   const ESP32_PORT = 81;
+
+  // ESP32 Logic Helper Functions (matching Arduino code pattern)
+  const getCurrentColor = () => {
+    return colorGroups[currentColorGroup]?.esp32Color || 'YELLOW';
+  };
+
+  const getLetterFromColorAndPosition = (colorName: string, positionIndex: number) => {
+    // Find color index (like your Arduino code variables c1, c2, c3, etc.)
+    const colorIndex = ESP32_LOGIC.colors.indexOf(colorName);
+    
+    // Use the helper function to get letter (matching your Arduino if-else logic)
+    return ESP32_LOGIC.getLetterForColorPosition(colorIndex, positionIndex);
+  };
+
+  const moveStepperUp = () => {
+    const newIndex = Math.min(currentPositionIndex + 1, 5);
+    setCurrentPositionIndex(newIndex);
+    
+    const currentColor = getCurrentColor();
+    const letter = getLetterFromColorAndPosition(currentColor, newIndex);
+    
+    // Send command to ESP32
+    sendESP32Command(ESP32_LOGIC.commands.UP);
+    
+    setOutputText(prev => prev + (prev ? '\n' : '') + 
+      `[${new Date().toLocaleTimeString()}] ⬆️ UP: Position ${newIndex} - ${currentColor}${letter ? ` (${letter})` : ''}`);
+  };
+
+  const moveStepperDown = () => {
+    const newIndex = Math.max(currentPositionIndex - 1, 0);
+    setCurrentPositionIndex(newIndex);
+    
+    const currentColor = getCurrentColor();
+    const letter = getLetterFromColorAndPosition(currentColor, newIndex);
+    
+    // Send command to ESP32
+    sendESP32Command(ESP32_LOGIC.commands.DOWN);
+    
+    setOutputText(prev => prev + (prev ? '\n' : '') + 
+      `[${new Date().toLocaleTimeString()}] ⬇️ DOWN: Position ${newIndex} - ${currentColor}${letter ? ` (${letter})` : ''}`);
+  };
+
+  const handleBlinkSelection = () => {
+    const currentColor = getCurrentColor();
+    const letter = getLetterFromColorAndPosition(currentColor, currentPositionIndex);
+    
+    if (letter) {
+      setOutputText(prev => prev + (prev ? '\n' : '') + 
+        `[${new Date().toLocaleTimeString()}] 🎯 SELECTED: ${letter} (${currentColor} - Position ${currentPositionIndex})`);
+      
+      // Add letter to output
+      addToOutput(letter);
+    }
+    
+    // Send command to ESP32
+    sendESP32Command(ESP32_LOGIC.commands.BLINK);
+  };
+
+  const resetPosition = () => {
+    setCurrentPositionIndex(0);
+    setCurrentColorGroup(0);
+    
+    // Send reset command to ESP32
+    sendESP32Command(ESP32_LOGIC.commands.RESET);
+    
+    setOutputText(prev => prev + (prev ? '\n' : '') + 
+      `[${new Date().toLocaleTimeString()}] 🔄 RESET: Position 0 - ${ESP32_LOGIC.colors[0]}`);
+  };
 
   const connectToESP32 = () => {
     try {
@@ -102,22 +250,55 @@ const DetectionPage: React.FC = () => {
   };
 
   const handleBlinkDetection = (blinkData: any) => {
+    // ESP32 Logic Implementation
     if (blinkData.action === 'UP') {
       if (selectionMode === 'color') {
+        // Color selection mode - navigate through colors
         setCurrentColorGroup((prev) => (prev + 1) % colorGroups.length);
-        sendESP32Command('UP');
+        setCurrentPositionIndex(0); // Reset position when changing color
+        
+        const newColorIndex = (currentColorGroup + 1) % colorGroups.length;
+        const newColor = colorGroups[newColorIndex].esp32Color;
+        
+        setOutputText(prev => prev + (prev ? '\n' : '') + 
+          `[${new Date().toLocaleTimeString()}] 🎨 Color UP: ${newColor}`);
+        
+        sendESP32Command(ESP32_LOGIC.commands.UP);
+      } else if (selectionMode === 'character') {
+        // Character selection mode - move stepper up
+        moveStepperUp();
       }
     } else if (blinkData.action === 'DOWN') {
       if (selectionMode === 'color') {
+        // Color selection mode - navigate through colors
         setCurrentColorGroup((prev) => (prev - 1 + colorGroups.length) % colorGroups.length);
-        sendESP32Command('DOWN');
+        setCurrentPositionIndex(0); // Reset position when changing color
+        
+        const newColorIndex = (currentColorGroup - 1 + colorGroups.length) % colorGroups.length;
+        const newColor = colorGroups[newColorIndex].esp32Color;
+        
+        setOutputText(prev => prev + (prev ? '\n' : '') + 
+          `[${new Date().toLocaleTimeString()}] 🎨 Color DOWN: ${newColor}`);
+        
+        sendESP32Command(ESP32_LOGIC.commands.DOWN);
+      } else if (selectionMode === 'character') {
+        // Character selection mode - move stepper down
+        moveStepperDown();
       }
     } else if (blinkData.action === 'SELECT') {
       if (selectionMode === 'color') {
+        // Switch to character selection mode
         setSelectionMode('character');
+        const currentColor = getCurrentColor();
+        
         setOutputText(prev => prev + (prev ? '\n' : '') + 
-          `[${new Date().toLocaleTimeString()}] 🎨 Selected ${colorGroups[currentColorGroup].name} group`);
-        sendESP32Command('SELECT');
+          `[${new Date().toLocaleTimeString()}] 🎨 Selected ${currentColor} - Now select position`);
+        
+        sendESP32Command(ESP32_LOGIC.commands.BLINK);
+      } else if (selectionMode === 'character') {
+        // Select current letter and return to color mode
+        handleBlinkSelection();
+        setSelectionMode('color');
       }
     }
   };
@@ -198,57 +379,9 @@ const DetectionPage: React.FC = () => {
             <div className="flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-blue-500/30 to-purple-500/30 border border-blue-400/50 text-blue-300 shadow-blue-500/25 rounded-full backdrop-blur-lg shadow-2xl transition-all duration-500 transform hover:scale-105">
               <div className="w-4 h-4 bg-blue-400 rounded-full shadow-lg animate-pulse" />
               <span className="font-semibold text-sm tracking-wide">{getModeTitle()}</span>
-              <div 
-                className="relative"
-                onMouseEnter={() => setIsInstructionsVisible(true)}
-                onMouseLeave={() => setIsInstructionsVisible(false)}
-              >
-                <button className="text-blue-200 font-bold text-lg hover:text-blue-100 transition-colors cursor-help">
-                  !
-                </button>
-                {isInstructionsVisible && (
-                  <div className="absolute bottom-full right-0 mb-2 w-80 bg-gray-900/80 backdrop-blur-lg border border-white/20 rounded-2xl p-6 shadow-2xl z-20">
-                    <h4 className="text-white font-bold text-lg mb-4 flex items-center gap-3">
-                      <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-violet-500 rounded-full flex items-center justify-center">
-                        💡
-                      </div>
-                      Instructions
-                    </h4>
-                    <div className="text-sm text-gray-200 space-y-3">
-                      <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl">
-                        <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                        <p><span className="font-bold text-blue-300">UP Blink:</span> Navigate color groups upward</p>
-                      </div>
-                      <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl">
-                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                        <p><span className="font-bold text-green-300">DOWN Blink:</span> Navigate color groups downward</p>
-                      </div>
-                      <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl">
-                        <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></div>
-                        <p><span className="font-bold text-purple-300">LONG Blink:</span> Select current group</p>
-                      </div>
-                      <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl">
-                        <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
-                        <p><span className="font-bold text-yellow-300">Click:</span> Add characters to output</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
             </div>
 
-            {/* Color Wheel Selector */}
-            <div className="flex items-center gap-3 px-3 py-3 bg-white/10 backdrop-blur-lg border border-white/30 rounded-full shadow-2xl transition-all duration-300 hover:scale-105">
-              <ColorWheelSelector
-                colorGroups={colorGroups}
-                currentColorGroup={currentColorGroup}
-                onColorSelect={setCurrentColorGroup}
-                size={36}
-              />
-              <span className="text-white font-semibold text-sm tracking-wide">
-                {colorGroups[currentColorGroup].name}
-              </span>
-            </div>
+
 
             {/* IP Address Input */}
             <div className="flex items-center gap-2 bg-white/10 backdrop-blur-lg border border-white/30 px-4 py-2 rounded-full">
@@ -308,6 +441,32 @@ const DetectionPage: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Left Column - Controls */}
           <div className="space-y-6">
+            {/* Color Wheel Selector */}
+            <div className="bg-white/10 backdrop-blur-xl border border-white/30 rounded-2xl p-6 shadow-2xl shadow-cyan-500/10">
+              <h3 className="text-white font-bold text-lg mb-6 flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full flex items-center justify-center">
+                  🎨
+                </div>
+                Color Selection
+              </h3>
+              <div className="flex items-center justify-center gap-4 p-4 bg-white/5 rounded-xl backdrop-blur-sm">
+                <ColorWheelSelector
+                  colorGroups={colorGroups}
+                  currentColorGroup={currentColorGroup}
+                  onColorSelect={setCurrentColorGroup}
+                  size={48}
+                />
+                <div className="text-center">
+                  <div className="text-white font-semibold text-lg">
+                    {colorGroups[currentColorGroup].name}
+                  </div>
+                  <div className="text-gray-300 text-sm mt-1">
+                    Current Color Group
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* ESP32 Connection Panel */}
             {!isESP32Connected && (
               <div className="bg-white/10 backdrop-blur-xl border border-white/30 rounded-2xl p-6 shadow-2xl shadow-blue-500/10">
@@ -360,33 +519,89 @@ const DetectionPage: React.FC = () => {
               </div>
             )}
 
-            {/* Letter/Number Mapping */}
+            {/* ESP32 Character Selection */}
             {selectionMode === 'character' && (
               <div className="bg-white/10 backdrop-blur-xl border border-white/30 rounded-2xl p-6 shadow-2xl shadow-blue-500/10">
                 <h3 className="text-white font-bold text-lg mb-6 flex items-center gap-3">
                   <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full flex items-center justify-center">
-                    🔡
+                    🎯
                   </div>
-                  Available Characters ({colorGroups[currentColorGroup].name})
+                  ESP32 Position Selection ({getCurrentColor()})
                 </h3>
-                <div className="flex flex-wrap gap-3">
-                  {colorGroups[currentColorGroup].letters.map((letter) => (
-                    <button
-                      key={letter}
-                      className={`px-5 py-3 rounded-xl ${colorGroups[currentColorGroup].color} text-white font-mono text-lg font-bold hover:scale-125 transition-all duration-300 transform shadow-lg backdrop-blur-sm border border-white/20 hover:shadow-2xl`}
-                      onClick={() => addToOutput(letter)}
-                    >
-                      {letter}
-                    </button>
-                  ))}
+                
+                {/* Current Position Display */}
+                <div className="mb-6 p-4 bg-black/40 rounded-xl border border-white/20">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-300 text-sm">Current Position:</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-white font-mono text-xl">{currentPositionIndex}</span>
+                      <span className="text-gray-400">({ESP32_LOGIC.positions[currentPositionIndex]}°)</span>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between">
+                    <span className="text-gray-300 text-sm">Available Letter:</span>
+                    <span className="text-yellow-300 font-mono text-2xl font-bold">
+                      {getLetterFromColorAndPosition(getCurrentColor(), currentPositionIndex) || 'None'}
+                    </span>
+                  </div>
                 </div>
-                <button
-                  className="mt-4 text-sm text-blue-300 hover:text-blue-200 font-semibold transition-colors duration-300 flex items-center gap-2"
-                  onClick={() => setSelectionMode('color')}
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  Back to Color Selection
-                </button>
+
+                {/* Position Control Buttons */}
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                  <button
+                    onClick={moveStepperUp}
+                    className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg font-semibold"
+                  >
+                    ⬆️ UP
+                  </button>
+                  <button
+                    onClick={handleBlinkSelection}
+                    className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg font-semibold"
+                  >
+                    ✓ SELECT
+                  </button>
+                  <button
+                    onClick={moveStepperDown}
+                    className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-xl transition-all duration-300 transform hover:scale-105 shadow-lg font-semibold"
+                  >
+                    ⬇️ DOWN
+                  </button>
+                </div>
+
+                {/* Available Letters for Current Color */}
+                <div className="mb-4">
+                  <h4 className="text-gray-300 text-sm mb-3">All Available Letters for {getCurrentColor()}:</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(ESP32_LOGIC.letterMapping[getCurrentColor() as keyof typeof ESP32_LOGIC.letterMapping] || {}).map(([pos, letter]) => (
+                      <div 
+                        key={pos}
+                        className={`px-3 py-2 rounded-lg border text-sm font-mono ${
+                          currentPositionIndex === parseInt(pos) 
+                            ? `${colorGroups[currentColorGroup].color} text-white border-white/50 shadow-lg` 
+                            : 'bg-white/10 text-gray-300 border-white/20'
+                        }`}
+                      >
+                        Pos {pos}: {letter}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    className="text-sm text-blue-300 hover:text-blue-200 font-semibold transition-colors duration-300 flex items-center gap-2"
+                    onClick={() => setSelectionMode('color')}
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    Back to Color Selection
+                  </button>
+                  <button
+                    onClick={resetPosition}
+                    className="text-sm text-orange-300 hover:text-orange-200 font-semibold transition-colors duration-300 flex items-center gap-2"
+                  >
+                    🔄 Reset Position
+                  </button>
+                </div>
               </div>
             )}
 
@@ -459,8 +674,22 @@ const DetectionPage: React.FC = () => {
                     <span className="text-white font-semibold">{colorGroups[currentColorGroup].name}</span>
                   </div>
                 </div>
+                <div className="flex justify-between items-center p-3 bg-white/5 rounded-xl backdrop-blur-sm">
+                  <span className="text-gray-300 font-medium">ESP32 Position:</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-white font-semibold font-mono">{currentPositionIndex}</span>
+                    <span className="text-gray-400 text-xs">({ESP32_LOGIC.positions[currentPositionIndex]}°)</span>
+                  </div>
+                </div>
+                <div className="flex justify-between items-center p-3 bg-white/5 rounded-xl backdrop-blur-sm">
+                  <span className="text-gray-300 font-medium">Available Letter:</span>
+                  <span className="text-yellow-300 font-mono text-lg font-bold">
+                    {getLetterFromColorAndPosition(getCurrentColor(), currentPositionIndex) || 'None'}
+                  </span>
+                </div>
               </div>
             </div>
+
           </div>
 
           {/* Right Column - Output & Instructions */}
@@ -508,16 +737,6 @@ const DetectionPage: React.FC = () => {
                 >
                   <Trash2 className="w-5 h-5" />
                 </button>
-              </div>
-            </div>
-
-            {/* Mode Display */}
-            <div className="bg-white/10 backdrop-blur-xl border border-white/30 rounded-2xl p-4 shadow-2xl shadow-purple-500/10">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
-                  <Eye className="w-4 h-4 text-white" />
-                </div>
-                <span className="text-white font-bold text-lg">{getModeTitle()}</span>
               </div>
             </div>
           </div>
